@@ -22,6 +22,8 @@ import info.guardianproject.otr.app.im.R;
 import info.guardianproject.otr.app.im.provider.Imps;
 import info.guardianproject.util.LogCleaner;
 
+import com.hipmob.gifanimationdrawable.GifAnimationDrawable;
+
 import java.io.File;
 import java.io.InputStream;
 import java.io.IOException;
@@ -340,35 +342,15 @@ public class MessageView extends LinearLayout {
         return list.size() > 0;  
     }
 
-    private void findThumbnail(int id, SpannableString s,ImageView mMediaThumbnail ){
+    private void findThumbnail(int id, SpannableString s, ImageView mMediaThumbnail ){
         Pattern pattern = Pattern.compile("^http://.*?[\\.gif|\\.png|\\.jpg|\\.jpeg]$");
         Matcher m = pattern.matcher(s);
         if (m.find()){
-
-            Uri mediaUri = Uri.parse( m.group(0) ) ;
+            Uri mediaUri = Uri.parse( m.group(0) );
             mHolder.mMediaThumbnail.setVisibility(View.VISIBLE);
             setImageThumbnail( getContext().getContentResolver(), id, mHolder, mediaUri );
-//            if (m.start() == 0){ // checking for end still missing
-//            mHolder.mTextViewForMessages.setText(lastMessage);
-//            mHolder.mTextViewForMessages.setVisibility(View.GONE);
-//        }
         }
 
-    }
-
-    private void expandImages(TextView textView) {
-        Pattern pattern = Pattern.compile("(http://.*?[\\.gif|\\.png|\\.jpg|\\.jpeg])$");
-        SpannableString s = SpannableString.valueOf(textView.getText());
-        Matcher m = pattern.matcher(s);
-
-        while (m.find()) {
-            int start = m.start();
-            int end = m.end();
-            boolean allowed = true;
-            Uri uri = Uri.parse(m.group(0));
-            ImageSpan span = new ImageSpan(getContext(), uri);
-            s.setSpan(span, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        }
     }
 
     /**
@@ -385,7 +367,7 @@ public class MessageView extends LinearLayout {
             setThumbnail(contentResolver, aHolder, mediaUri);
             return;
         }
-        
+
         // new file - scan
         File file = new File(mediaUri.getPath());
         final Handler handler = new Handler();
@@ -416,15 +398,15 @@ public class MessageView extends LinearLayout {
      * @param uri
      */
     private void setThumbnail(final ContentResolver contentResolver, final ViewHolder aHolder, final Uri uri) {
-        new AsyncTask<String, Void, Bitmap>() {
-            
+        new AsyncTask<String, Void, Object>() {
             @Override
-            protected Bitmap doInBackground(String... params) {
+            protected Object doInBackground(String... params) {
                 LogCleaner.debug(ImApp.LOG_TAG, "Processing Image from: " + uri.toString());
-                if (((String) uri.getScheme()).equals("http")) {
+                if (uri.getScheme().equals("http")) {
                     try {
                         InputStream s = (InputStream) new URL(uri.toString()).openStream();
                         if (s == null) throw new IOException("getContent was empty");
+                        if (uri.getPath().endsWith(".gif")) return new GifAnimationDrawable(s);
                         return BitmapFactory.decodeStream(s);
 //                        } catch (MalformedURLException e){
 //                    LogCleaner.error(ImApp.LOG_TAG, "error processing message", e);
@@ -442,23 +424,28 @@ public class MessageView extends LinearLayout {
             }
 
             @Override
-            protected void onPostExecute(Bitmap result) {
-                
-                if (uri != null && result != null)
-                {
-                    mBitmapCache.put(uri.toString(), result);
-                    
-                    // confirm the holder is still paired to this uri
-                    if( ! uri.equals( aHolder.mMediaUri ) ) {
-                        return ;
-                    }
-                    // thumbnail extraction failed, use bropken image icon
-                    if( result == null ) {
+            protected void onPostExecute(Object result) {
+
+                if (uri != null && result != null) {
+
+                    if( ! uri.equals( aHolder.mMediaUri ) ) return;
+
+
+                    if (result instanceof Bitmap){
+                        Bitmap bmp = (Bitmap) result;
+                        LogCleaner.debug(ImApp.LOG_TAG, "Bitmap!");
+                        mBitmapCache.put(uri.toString(), bmp); // Deprecation
+                        aHolder.mMediaThumbnail.setImageBitmap(bmp);
+                    } else if (result instanceof Drawable) {
+                        LogCleaner.debug(ImApp.LOG_TAG, "Drawable!");
+                        aHolder.mMediaThumbnail.setImageDrawable((Drawable) result);
+                    } else {
+                        // thumbnail extraction failed, use broken image icon
                         mHolder.mMediaThumbnail.setImageResource(R.drawable.ic_broken_image);
-                        return ;
                     }
-                    // set the thumbnail
-                    aHolder.mMediaThumbnail.setImageBitmap(result);
+                } else {
+                    // thumbnail extraction failed, use broken image icon
+                    mHolder.mMediaThumbnail.setImageResource(R.drawable.ic_broken_image);
                 }
             }
         }.execute();

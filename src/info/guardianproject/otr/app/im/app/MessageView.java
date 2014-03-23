@@ -23,11 +23,15 @@ import info.guardianproject.otr.app.im.provider.Imps;
 import info.guardianproject.util.LogCleaner;
 
 import java.io.File;
+import java.io.InputStream;
 import java.io.IOException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.net.URL;
 
 import android.content.ContentResolver;
 import android.content.Context;
@@ -37,6 +41,7 @@ import android.content.pm.ResolveInfo;
 import android.content.res.Resources;
 import android.database.Cursor;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.media.AudioManager;
@@ -48,11 +53,13 @@ import android.os.Handler;
 import android.provider.MediaStore;
 import android.support.v4.util.LruCache;
 import android.text.Spannable;
+import android.text.Spanned;
 import android.text.SpannableString;
 import android.text.style.ForegroundColorSpan;
 import android.text.style.RelativeSizeSpan;
 import android.text.style.StyleSpan;
 import android.text.style.URLSpan;
+import android.text.style.ImageSpan;
 import android.text.util.Linkify;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -211,6 +218,7 @@ public class MessageView extends LinearLayout {
                 EmojiManager.getInstance(getContext()).addEmoji(getContext(), spannablecontent);
                 
                 mHolder.mTextViewForMessages.setText(spannablecontent);
+                this.findThumbnail(id, spannablecontent, mHolder.mMediaThumbnail);
             } catch (IOException e) {
                 LogCleaner.error(ImApp.LOG_TAG, "error processing message", e);
             }
@@ -330,8 +338,38 @@ public class MessageView extends LinearLayout {
                 packageManager.queryIntentActivities(intent,  
                         PackageManager.MATCH_DEFAULT_ONLY);  
         return list.size() > 0;  
-    }  
+    }
 
+    private void findThumbnail(int id, SpannableString s,ImageView mMediaThumbnail ){
+        Pattern pattern = Pattern.compile("^http://.*?[\\.gif|\\.png|\\.jpg|\\.jpeg]$");
+        Matcher m = pattern.matcher(s);
+        if (m.find()){
+
+            Uri mediaUri = Uri.parse( m.group(0) ) ;
+            mHolder.mMediaThumbnail.setVisibility(View.VISIBLE);
+            setImageThumbnail( getContext().getContentResolver(), id, mHolder, mediaUri );
+//            if (m.start() == 0){ // checking for end still missing
+//            mHolder.mTextViewForMessages.setText(lastMessage);
+//            mHolder.mTextViewForMessages.setVisibility(View.GONE);
+//        }
+        }
+
+    }
+
+    private void expandImages(TextView textView) {
+        Pattern pattern = Pattern.compile("(http://.*?[\\.gif|\\.png|\\.jpg|\\.jpeg])$");
+        SpannableString s = SpannableString.valueOf(textView.getText());
+        Matcher m = pattern.matcher(s);
+
+        while (m.find()) {
+            int start = m.start();
+            int end = m.end();
+            boolean allowed = true;
+            Uri uri = Uri.parse(m.group(0));
+            ImageSpan span = new ImageSpan(getContext(), uri);
+            s.setSpan(span, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+    }
 
     /**
      * @param contentResolver 
@@ -382,10 +420,22 @@ public class MessageView extends LinearLayout {
             
             @Override
             protected Bitmap doInBackground(String... params) {
-                
+                LogCleaner.debug(ImApp.LOG_TAG, "Processing Image from: " + uri.toString());
+                if (((String) uri.getScheme()).equals("http")) {
+                    try {
+                        InputStream s = (InputStream) new URL(uri.toString()).openStream();
+                        if (s == null) throw new IOException("getContent was empty");
+                        return BitmapFactory.decodeStream(s);
+//                        } catch (MalformedURLException e){
+//                    LogCleaner.error(ImApp.LOG_TAG, "error processing message", e);
+                    } catch(IOException e) {
+                        LogCleaner.error(ImApp.LOG_TAG, "error processing message", e);
+                    }
+                }
+
                 Bitmap result = mBitmapCache.get(uri.toString());
-                
-                if (result == null)                
+
+                if (result == null)
                     return getThumbnail( contentResolver, uri );
                 else
                     return result;

@@ -1,13 +1,13 @@
 /*
  * Copyright (C) 2008 Esmertec AG. Copyright (C) 2008 The Android Open Source
  * Project
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License"); you may not
  * use this file except in compliance with the License. You may obtain a copy of
  * the License at
- * 
+ *
  * http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -73,47 +73,47 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 public class MessageView extends LinearLayout {
-    
+
     private static int sCacheSize = 512; // 1MiB
     private static LruCache<String,Bitmap> mBitmapCache = new LruCache<String,Bitmap>(sCacheSize);
-            
+
     public enum DeliveryState {
         NEUTRAL, DELIVERED, UNDELIVERED
     }
 
     public enum EncryptionState {
         NONE, ENCRYPTED, ENCRYPTED_AND_VERIFIED
-        
+
     }
     private CharSequence lastMessage = null;
-    
+
     public MessageView(Context context, AttributeSet attrs) {
         super(context, attrs);
-        
+
     }
 
     private ViewHolder mHolder = null;
-    
+
     private final static DateFormat MESSAGE_DATE_FORMAT = SimpleDateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT);
-    
+
 
     private final static char DELIVERED_SUCCESS = '\u2714';
     private final static char DELIVERED_FAIL = '\u2718';
 
-    class ViewHolder 
+    class ViewHolder
     {
 
         TextView mTextViewForMessages = (TextView) findViewById(R.id.message);
         TextView mTextViewForTimestamp = (TextView) findViewById(R.id.messagets);
-        ImageView mAvatar = (ImageView) findViewById(R.id.avatar);              
-        View mStatusBlock = findViewById(R.id.status_block);        
+        ImageView mAvatar = (ImageView) findViewById(R.id.avatar);
+        View mStatusBlock = findViewById(R.id.status_block);
         ImageView mMediaThumbnail = (ImageView) findViewById(R.id.media_thumbnail);
         View mContainer = findViewById(R.id.message_container);
-        
+
         // save the media uri while the MediaScanner is creating the thumbnail
         // if the holder was reused, the pair is broken
         Uri mMediaUri = null;
-        
+
         public void setOnClickListenerMediaThumbnail( final String mimeType, final String body ) {
             mMediaThumbnail.setOnClickListener( new OnClickListener() {
                 @Override
@@ -122,67 +122,67 @@ public class MessageView extends LinearLayout {
                 }
             });
         }
-        
+
         public void resetOnClickListenerMediaThumbnail() {
             mMediaThumbnail.setOnClickListener( null );
         }
-        
+
        long mTimeDiff = -1;
     }
-    
+
     @Override
     protected void onFinishInflate() {
         super.onFinishInflate();
-        
-      
+
+
         mHolder = (ViewHolder)getTag();
-        
+
         if (mHolder == null)
         {
-            mHolder = new ViewHolder();   
+            mHolder = new ViewHolder();
             setTag(mHolder);
-            
+
         }
 
     }
-    
+
 
     public URLSpan[] getMessageLinks() {
         return mHolder.mTextViewForMessages.getUrls();
     }
-    
+
 
     public String getLastMessage () {
         return lastMessage.toString();
     }
-    
+
     public void bindIncomingMessage(int id, String address, String nickname, final String mimeType, final String body, Date date, Markup smileyRes,
             boolean scrolling, EncryptionState encryption, boolean showContact) {
-      
+
         mHolder = (ViewHolder)getTag();
 
         mHolder.mTextViewForMessages.setVisibility(View.VISIBLE);
-        
+
         if (showContact && nickname != null)
         {
             String[] nickParts = nickname.split("/");
-            
+
             lastMessage = nickParts[nickParts.length-1] + ": " + formatMessage(body);
-            
+
         }
         else
         {
             lastMessage = formatMessage(body);
             showAvatar(address,true);
-        
-        mHolder.resetOnClickListenerMediaThumbnail();     
+
+        mHolder.resetOnClickListenerMediaThumbnail();
         if( mimeType != null ) {
-            mHolder.setOnClickListenerMediaThumbnail(mimeType, body);     
+            mHolder.setOnClickListenerMediaThumbnail(mimeType, body);
             lastMessage = "";
             // if a new uri, display generic icon first, then set it to the media icon/thumbnail
             Uri mediaUri = Uri.parse( body ) ;
-            
-            mHolder.mMediaThumbnail.setVisibility(View.VISIBLE);                       
+
+            mHolder.mMediaThumbnail.setVisibility(View.VISIBLE);
             mHolder.mTextViewForMessages.setText(lastMessage);
             mHolder.mTextViewForMessages.setVisibility(View.GONE);
             if( mimeType.startsWith("image/")||mimeType.startsWith("video/") ) {
@@ -195,31 +195,31 @@ public class MessageView extends LinearLayout {
             else
             {
                 mHolder.mMediaThumbnail.setImageResource(R.drawable.ic_file); // generic file icon
-                
+
             }
-            
+
         } else {
             mHolder.mMediaThumbnail.setVisibility(View.GONE);
             if (showContact)
             {
                 String[] nickParts = nickname.split("/");
-                
+
                 lastMessage = nickParts[nickParts.length-1] + ": " + formatMessage(body);
-                
+
             }
             else
             {
                 lastMessage = formatMessage(body);
             }
         }
-	}	
-        
+	}
+
         if (lastMessage.length() > 0)
         {
             try {
                 SpannableString spannablecontent=new SpannableString(lastMessage);
                 EmojiManager.getInstance(getContext()).addEmoji(getContext(), spannablecontent);
-                
+
                 mHolder.mTextViewForMessages.setText(spannablecontent);
                 this.findThumbnail(id, spannablecontent, mHolder.mMediaThumbnail);
             } catch (IOException e) {
@@ -230,69 +230,69 @@ public class MessageView extends LinearLayout {
         {
             mHolder.mTextViewForMessages.setText(lastMessage);
         }
-        
-        
+
+
         if (date != null)
         {
          CharSequence tsText = formatTimeStamp(date,MESSAGE_DATE_FORMAT, null);
-         
+
          mHolder.mTextViewForTimestamp.setText(tsText);
          mHolder.mTextViewForTimestamp.setVisibility(View.VISIBLE);
-        
+
         }
         else
         {
-            
+
             mHolder.mTextViewForTimestamp.setText("");
             //mHolder.mTextViewForTimestamp.setVisibility(View.GONE);
-           
+
         }
 
 
         if (encryption == EncryptionState.NONE)
         {
-            
+
             mHolder.mStatusBlock.setBackgroundResource(R.color.holo_red_dark);
-               
+
         }
         else if (encryption == EncryptionState.ENCRYPTED)
         {
-            
+
             mHolder.mStatusBlock.setBackgroundResource(R.color.holo_orange_light);
-            
+
             //mHolder.mEncryptionIcon.setImageResource(R.drawable.lock16);
-            
-            
+
+
         }
         else if (encryption == EncryptionState.ENCRYPTED_AND_VERIFIED)
         {
-            
+
             mHolder.mStatusBlock.setBackgroundResource(R.color.holo_green_dark);
-            
+
             //mHolder.mEncryptionIcon.setImageResource(R.drawable.lock16);
-            
+
         }
-        
+
       //  mHolder.mTextViewForMessages.setTextColor(getResources().getColor(R.color.incoming_message_fg));
-       
+
         Linkify.addLinks(mHolder.mTextViewForMessages, Linkify.ALL);
-        
+
     }
-    
+
     private MediaPlayer mMediaPlayer = null;
-    
+
     /**
      * @param mimeType
      * @param body
      */
     protected void onClickMediaIcon(String mimeType, String body) {
-        
+
         if (mimeType.startsWith("audio") || (body.endsWith("3gp")||body.endsWith("amr")))
         {
-           
+
             if (mMediaPlayer != null)
                 mMediaPlayer.release();
-            
+
             try
             {
                 mMediaPlayer = new  MediaPlayer();
@@ -300,18 +300,18 @@ public class MessageView extends LinearLayout {
                 mMediaPlayer.setDataSource(body);
                 mMediaPlayer.prepare();
                 mMediaPlayer.start();
-                
+
                 return;
             } catch (IOException e) {
                 Log.e(ImApp.LOG_TAG,"error playing audio: " + body,e);
             }
-            
-            
+
+
         }
-        
+
         Intent intent = new Intent(Intent.ACTION_VIEW);
         intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK|Intent.FLAG_ACTIVITY_NEW_TASK);
-      
+
         //set a general mime type not specific
         if (mimeType != null)
         {
@@ -321,26 +321,26 @@ public class MessageView extends LinearLayout {
         {
             intent.setData(Uri.parse( body ));
         }
-        
+
         Context context = getContext().getApplicationContext();
-        
+
         if (isIntentAvailable(context,intent))
-        {        
+        {
             context.startActivity(intent);
         }
         else
         {
             Toast.makeText(getContext(), R.string.there_is_no_viewer_available_for_this_file_format, Toast.LENGTH_LONG).show();
         }
-        
+
     }
-    
-    public static boolean isIntentAvailable(Context context, Intent intent) {  
-        final PackageManager packageManager = context.getPackageManager();  
-        List<ResolveInfo> list =  
-                packageManager.queryIntentActivities(intent,  
-                        PackageManager.MATCH_DEFAULT_ONLY);  
-        return list.size() > 0;  
+
+    public static boolean isIntentAvailable(Context context, Intent intent) {
+        final PackageManager packageManager = context.getPackageManager();
+        List<ResolveInfo> list =
+                packageManager.queryIntentActivities(intent,
+                        PackageManager.MATCH_DEFAULT_ONLY);
+        return list.size() > 0;
     }
 
     private void findThumbnail(int id, SpannableString s, ImageView mMediaThumbnail ){
@@ -355,8 +355,8 @@ public class MessageView extends LinearLayout {
     }
 
     /**
-     * @param contentResolver 
-     * @param id 
+     * @param contentResolver
+     * @param id
      * @param aHolder
      * @param mediaUri
      */
@@ -371,24 +371,24 @@ public class MessageView extends LinearLayout {
     {
         return android.text.Html.fromHtml(body).toString();
     }
-    
+
     public void bindOutgoingMessage(int id, String address, final String mimeType, final String body, Date date, Markup smileyRes, boolean scrolling,
             DeliveryState delivery, EncryptionState encryption) {
-        
+
         mHolder = (ViewHolder)getTag();
 
         mHolder.mTextViewForMessages.setVisibility(View.VISIBLE);
-        mHolder.resetOnClickListenerMediaThumbnail();     
+        mHolder.resetOnClickListenerMediaThumbnail();
         if( mimeType != null ) {
-            mHolder.setOnClickListenerMediaThumbnail(mimeType, body);  
+            mHolder.setOnClickListenerMediaThumbnail(mimeType, body);
 
             lastMessage = "";
             // if a new uri, display generic icon first, then set it to the media icon/thumbnail
             Uri mediaUri = Uri.parse( body ) ;
-            
+
             mHolder.mTextViewForMessages.setText("");//no message if there is a file mimeType
             mHolder.mTextViewForMessages.setVisibility(View.GONE);
-            mHolder.mMediaThumbnail.setVisibility(View.VISIBLE);            
+            mHolder.mMediaThumbnail.setVisibility(View.VISIBLE);
             if( mimeType.startsWith("image/")||mimeType.startsWith("video/") ) {
                 setImageThumbnail( getContext().getContentResolver(), id, mHolder, mediaUri );
             }
@@ -399,80 +399,80 @@ public class MessageView extends LinearLayout {
             else
             {
                 mHolder.mMediaThumbnail.setImageResource(R.drawable.ic_file); // generic file icon
-                
+
             }
-            
+
         } else {
             mHolder.mMediaThumbnail.setVisibility(View.GONE);
             lastMessage = body;//formatMessage(body);
-         
+
              try {
 
                  SpannableString spannablecontent=new SpannableString(lastMessage);
-    
+
                  EmojiManager.getInstance(getContext()).addEmoji(getContext(), spannablecontent);
-                 
+
                  mHolder.mTextViewForMessages.setText(spannablecontent);
              } catch (IOException e) {
                  // TODO Auto-generated catch block
                  e.printStackTrace();
              }
         }
-         
-       
+
+
 
         mHolder.mStatusBlock.setVisibility(VISIBLE);
 
 //        mHolder.mMessageContainer.setBackgroundResource(R.drawable.background_plaintext);
-        
+
         if (encryption == EncryptionState.NONE)
         {
 
             mHolder.mStatusBlock.setBackgroundResource(R.color.holo_red_dark);
 
-               
+
         }
         else if (encryption == EncryptionState.ENCRYPTED)
         {
-            mHolder.mStatusBlock.setBackgroundResource(R.color.holo_orange_light);            
-     
+            mHolder.mStatusBlock.setBackgroundResource(R.color.holo_orange_light);
+
         }
-        
+
         else if (encryption == EncryptionState.ENCRYPTED_AND_VERIFIED)
         {
             mHolder.mStatusBlock.setBackgroundResource(R.color.holo_green_dark);
-            
+
         }
 
 
         if (date != null)
         {
-            
-            mHolder.mTextViewForTimestamp.setText(formatTimeStamp(date,MESSAGE_DATE_FORMAT, delivery));            
-            mHolder.mTextViewForTimestamp.setVisibility(View.VISIBLE);            
-         
+
+            mHolder.mTextViewForTimestamp.setText(formatTimeStamp(date,MESSAGE_DATE_FORMAT, delivery));
+            mHolder.mTextViewForTimestamp.setVisibility(View.VISIBLE);
+
         }
         else
         {
-            mHolder.mTextViewForTimestamp.setText("");      
+            mHolder.mTextViewForTimestamp.setText("");
 
         }
-        
-                  
+
+
         Linkify.addLinks(mHolder.mTextViewForMessages, Linkify.ALL);
-        
+
     }
 
     private void showAvatar (String address, boolean isLeft)
     {
 
-        mHolder.mAvatar.setVisibility(View.GONE);        
-        
+        mHolder.mAvatar.setVisibility(View.GONE);
+
         if (address != null)
         {
-            
+
             Drawable avatar = DatabaseUtils.getAvatarFromAddress(this.getContext().getContentResolver(),address, ImApp.DEFAULT_AVATAR_WIDTH,ImApp.DEFAULT_AVATAR_HEIGHT);
-    
+
             if (avatar != null)
             {
                 if (isLeft)
@@ -485,13 +485,13 @@ public class MessageView extends LinearLayout {
             {
                 mHolder.mAvatar.setVisibility(View.GONE);
             }
-                
-            
-        }    
+
+
+        }
     }
 
     public void bindPresenceMessage(String contact, int type, boolean isGroupChat, boolean scrolling) {
-        
+
         mHolder = (ViewHolder)getTag();
 
         CharSequence message = formatPresenceUpdates(contact, type, isGroupChat, scrolling);
@@ -501,7 +501,7 @@ public class MessageView extends LinearLayout {
     }
 
     public void bindErrorMessage(int errCode) {
-        
+
         mHolder = (ViewHolder)getTag();
 
         mHolder.mTextViewForMessages.setText(R.string.msg_sent_failed);
@@ -510,42 +510,42 @@ public class MessageView extends LinearLayout {
     }
 
     private SpannableString formatTimeStamp(Date date, DateFormat format, MessageView.DeliveryState delivery) {
-        
+
 
         StringBuilder deliveryText = new StringBuilder();
         deliveryText.append(format.format(date));
         deliveryText.append(' ');
-        
+
         if (delivery != null)
         {
             if (delivery == DeliveryState.DELIVERED) {
-                
+
                 deliveryText.append(DELIVERED_SUCCESS);
-                    
+
             } else if (delivery == DeliveryState.UNDELIVERED) {
-    
+
                 deliveryText.append(DELIVERED_FAIL);
-                
-            } 
+
+            }
         }
-        
+
         SpannableString spanText = new SpannableString(deliveryText.toString());
         int len = spanText.length();
         spanText.setSpan(new StyleSpan(Typeface.ITALIC), 0, len, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-        
+
         spanText.setSpan(new RelativeSizeSpan(0.8f), 0, len, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
     //    spanText.setSpan(new ForegroundColorSpan(R.color.soft_grey),
       //        0, len, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-     
+
         return spanText;
     }
 
     private CharSequence formatPresenceUpdates(String contact, int type, boolean isGroupChat,
             boolean scrolling) {
         String body;
-        
+
         Resources resources =getResources();
-        
+
         switch (type) {
         case Imps.MessageType.PRESENCE_AVAILABLE:
             body = resources.getString(isGroupChat ? R.string.contact_joined

@@ -23,6 +23,7 @@ import info.guardianproject.otr.app.im.provider.Imps;
 import info.guardianproject.util.LogCleaner;
 
 import com.hipmob.gifanimationdrawable.GifAnimationDrawable;
+import com.bumptech.glide.Glide;
 
 import java.io.File;
 import java.io.InputStream;
@@ -362,110 +363,9 @@ public class MessageView extends LinearLayout {
     private void setImageThumbnail(final ContentResolver contentResolver, final int id, final ViewHolder aHolder, final Uri mediaUri) {
         // pair this holder to the uri. if the holder is recycled, the pairing is broken
         aHolder.mMediaUri = mediaUri;
-        // if a content uri - already scanned
-        if( mediaUri.getScheme() != null ) {
-            setThumbnail(contentResolver, aHolder, mediaUri);
-            return;
-        }
-
-        // new file - scan
-        File file = new File(mediaUri.getPath());
-        final Handler handler = new Handler();
-        MediaScannerConnection.scanFile(
-                getContext(), new String[] { file.toString() }, null,
-                new MediaScannerConnection.OnScanCompletedListener() {
-                    public void onScanCompleted(String path, final Uri uri) {
-                        // write the uri into the db
-                        Imps.updateMessageBody(contentResolver, id, uri.toString() );
-                        handler.post( new Runnable() {
-                            @Override
-                            public void run() {
-                                // confirm the holder is still paired to this uri
-                                if( aHolder.mMediaUri == mediaUri ) {
-                                    setThumbnail(contentResolver, aHolder, uri);
-                                }
-                            }
-                        });
-                    }
-                });
-        
-                
+        Glide.load(mediaUri)
+             .into(mHolder.mMediaThumbnail);
     }
-    
-    /**
-     * @param contentResolver 
-     * @param aHolder
-     * @param uri
-     */
-    private void setThumbnail(final ContentResolver contentResolver, final ViewHolder aHolder, final Uri uri) {
-        new AsyncTask<String, Void, Object>() {
-            @Override
-            protected Object doInBackground(String... params) {
-                LogCleaner.debug(ImApp.LOG_TAG, "Processing Image from: " + uri.toString());
-                if (uri.getScheme().equals("http")) {
-                    try {
-                        InputStream s = (InputStream) new URL(uri.toString()).openStream();
-                        if (s == null) throw new IOException("getContent was empty");
-                        if (uri.getPath().endsWith(".gif")) return new GifAnimationDrawable(s);
-                        return BitmapFactory.decodeStream(s);
-//                        } catch (MalformedURLException e){
-//                    LogCleaner.error(ImApp.LOG_TAG, "error processing message", e);
-                    } catch(IOException e) {
-                        LogCleaner.error(ImApp.LOG_TAG, "error processing message", e);
-                    }
-                }
-
-                Bitmap result = mBitmapCache.get(uri.toString());
-
-                if (result == null)
-                    return getThumbnail( contentResolver, uri );
-                else
-                    return result;
-            }
-
-            @Override
-            protected void onPostExecute(Object result) {
-
-                if (uri != null && result != null) {
-
-                    if( ! uri.equals( aHolder.mMediaUri ) ) return;
-
-
-                    if (result instanceof Bitmap){
-                        Bitmap bmp = (Bitmap) result;
-                        LogCleaner.debug(ImApp.LOG_TAG, "Bitmap!");
-                        mBitmapCache.put(uri.toString(), bmp); // Deprecation
-                        aHolder.mMediaThumbnail.setImageBitmap(bmp);
-                    } else if (result instanceof Drawable) {
-                        LogCleaner.debug(ImApp.LOG_TAG, "Drawable!");
-                        aHolder.mMediaThumbnail.setImageDrawable((Drawable) result);
-                    } else {
-                        // thumbnail extraction failed, use broken image icon
-                        mHolder.mMediaThumbnail.setImageResource(R.drawable.ic_broken_image);
-                    }
-                } else {
-                    // thumbnail extraction failed, use broken image icon
-                    mHolder.mMediaThumbnail.setImageResource(R.drawable.ic_broken_image);
-                }
-            }
-        }.execute();
-    }
-
-    public static Bitmap getThumbnail(ContentResolver cr, Uri uri) {
-        String[] projection = {MediaStore.Images.Media._ID};
-        Cursor cursor = cr.query( uri, projection, null, null, null);
-        if( cursor == null || cursor.getCount() == 0 ) {
-            return null ;
-        }
-        cursor.moveToFirst();
-        int columnIndex = cursor.getColumnIndex(projection[0]);
-        int id = cursor.getInt(columnIndex);
-        cursor.close();
-        
-        Bitmap bitmap = MediaStore.Images.Thumbnails.getThumbnail(cr, id, MediaStore.Images.Thumbnails.MINI_KIND, null );
-        return bitmap;
-    }    
-    
 
     private String formatMessage (String body)
     {

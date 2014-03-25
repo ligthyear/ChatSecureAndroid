@@ -21,9 +21,13 @@ import info.guardianproject.emoji.EmojiManager;
 import info.guardianproject.otr.app.im.R;
 import info.guardianproject.otr.app.im.provider.Imps;
 import info.guardianproject.util.LogCleaner;
+import info.guardianproject.util.VolleySingleton;
 
 import com.hipmob.gifanimationdrawable.GifAnimationDrawable;
-import com.bumptech.glide.Glide;
+import com.android.volley.RequestQueue;
+import com.android.volley.toolbox.ImageLoader;
+// import com.bumptech.glide.Glide;
+
 
 import java.io.File;
 import java.io.InputStream;
@@ -76,6 +80,8 @@ public class MessageView extends LinearLayout {
 
     private static int sCacheSize = 512; // 1MiB
     private static LruCache<String,Bitmap> mBitmapCache = new LruCache<String,Bitmap>(sCacheSize);
+    private RequestQueue mRequestQueue;
+    private ImageLoader mImageLoader;
 
     public enum DeliveryState {
         NEUTRAL, DELIVERED, UNDELIVERED
@@ -146,7 +152,6 @@ public class MessageView extends LinearLayout {
 
     }
 
-
     public URLSpan[] getMessageLinks() {
         return mHolder.mTextViewForMessages.getUrls();
     }
@@ -186,7 +191,7 @@ public class MessageView extends LinearLayout {
             mHolder.mTextViewForMessages.setText(lastMessage);
             mHolder.mTextViewForMessages.setVisibility(View.GONE);
             if( mimeType.startsWith("image/")||mimeType.startsWith("video/") ) {
-                setImageThumbnail( getContext().getContentResolver(), id, mHolder, mediaUri );
+                setImageThumbnail( getContext(), mHolder, mediaUri );
             }
             else if (mimeType.startsWith("audio"))
             {
@@ -344,12 +349,12 @@ public class MessageView extends LinearLayout {
     }
 
     private void findThumbnail(int id, SpannableString s, ImageView mMediaThumbnail ){
-        Pattern pattern = Pattern.compile("^http://.*?[\\.gif|\\.png|\\.jpg|\\.jpeg]$");
+        Pattern pattern = Pattern.compile("^http://.*?([\\.gif|\\.png|\\.jpg|\\.jpeg])$");
         Matcher m = pattern.matcher(s);
         if (m.find()){
             Uri mediaUri = Uri.parse( m.group(0) );
             mHolder.mMediaThumbnail.setVisibility(View.VISIBLE);
-            setImageThumbnail( getContext().getContentResolver(), id, mHolder, mediaUri );
+            setImageThumbnail( getContext(), mHolder, mediaUri );
         }
 
     }
@@ -360,11 +365,12 @@ public class MessageView extends LinearLayout {
      * @param aHolder
      * @param mediaUri
      */
-    private void setImageThumbnail(final ContentResolver contentResolver, final int id, final ViewHolder aHolder, final Uri mediaUri) {
+    private void setImageThumbnail(Context context, final ViewHolder aHolder, final Uri mediaUri) {
         // pair this holder to the uri. if the holder is recycled, the pairing is broken
         aHolder.mMediaUri = mediaUri;
-        Glide.load(mediaUri)
-             .into(mHolder.mMediaThumbnail);
+        ImageLoader imageLoader = VolleySingleton.getInstance(context).getImageLoader();
+        imageLoader.get(mediaUri.toString(),
+            ImageLoader.getImageListener(aHolder.mMediaThumbnail, 0, 0));
     }
 
     private String formatMessage (String body)
@@ -390,7 +396,7 @@ public class MessageView extends LinearLayout {
             mHolder.mTextViewForMessages.setVisibility(View.GONE);
             mHolder.mMediaThumbnail.setVisibility(View.VISIBLE);
             if( mimeType.startsWith("image/")||mimeType.startsWith("video/") ) {
-                setImageThumbnail( getContext().getContentResolver(), id, mHolder, mediaUri );
+                setImageThumbnail( getContext(), mHolder, mediaUri );
             }
             else if (mimeType.startsWith("audio"))
             {

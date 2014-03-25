@@ -368,9 +368,8 @@ public class MessageView extends LinearLayout {
     private void setImageThumbnail(Context context, final ViewHolder aHolder, final Uri mediaUri) {
         // pair this holder to the uri. if the holder is recycled, the pairing is broken
         aHolder.mMediaUri = mediaUri;
-        ImageLoader imageLoader = VolleySingleton.getInstance(context).getImageLoader();
-        imageLoader.get(mediaUri.toString(),
-            ImageLoader.getImageListener(aHolder.mMediaThumbnail, 0, 0));
+        VolleySingleton.getInstance(context).loadImage(
+            mediaUri.toString(), aHolder.mMediaThumbnail, R.drawable.ic_file, 0);
     }
 
     private String formatMessage (String body)

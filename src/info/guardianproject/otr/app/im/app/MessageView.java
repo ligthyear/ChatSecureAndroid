@@ -123,12 +123,14 @@ public class MessageView extends LinearLayout {
         Uri mMediaUri = null;
 
         public void setOnClickListenerMediaThumbnail( final String mimeType, final String body ) {
-            mMediaThumbnail.setOnClickListener( new OnClickListener() {
+            OnClickListener listener = new OnClickListener() {
                 @Override
                 public void onClick(View v) {
                     onClickMediaIcon( mimeType, body );
                 }
-            });
+            };
+            mMediaThumbnail.setOnClickListener(listener);
+            mMediaTitle.setOnClickListener(listener);
         }
 
         public void resetOnClickListenerMediaThumbnail() {
@@ -293,7 +295,7 @@ public class MessageView extends LinearLayout {
      * @param body
      */
     protected void onClickMediaIcon(String mimeType, String body) {
-        Context context = getContext().getApplicationContext();
+        Context context = getContext(); //.getApplicationContext();
 
         if (mimeType.startsWith("audio") || (body.endsWith("3gp")||body.endsWith("amr")))
         {

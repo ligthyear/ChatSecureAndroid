@@ -94,7 +94,7 @@ public class VolleySingleton {
         }
     }
 
-    private RequestQueue mRequestQueue;
+    public RequestQueue mRequestQueue;
     private ImageLoader mImageLoader;
     private DoubleCache mImageCache;
 

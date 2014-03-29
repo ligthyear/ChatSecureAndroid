@@ -70,6 +70,19 @@
             android:textAppearance="?android:attr/textAppearanceSmall"
             />
 
+
+        <TextView
+            android:id="@+id/media_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_below="@+id/message"
+            android:layout_marginBottom="1dp"
+            android:padding="2dp"
+            android:visibility="gone"
+            android:fontFamily="sans-serif-light"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            />
+
         <ImageView
             android:id="@+id/media_thumbnail"
             android:layout_width="196dp"
@@ -78,7 +91,7 @@
             android:scaleType="fitCenter"
             android:src="@drawable/ic_file"
             android:visibility="gone"
-            android:layout_below="@+id/message"
+            android:layout_below="@+id/media_title"
             />
 
 

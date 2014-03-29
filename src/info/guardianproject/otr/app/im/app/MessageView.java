@@ -25,7 +25,10 @@ import info.guardianproject.util.VolleySingleton;
 
 import com.hipmob.gifanimationdrawable.GifAnimationDrawable;
 import com.android.volley.RequestQueue;
-import com.android.volley.toolbox.ImageLoader;
+import com.android.volley.Request;
+import com.android.volley.VolleyError;
+import com.android.volley.Response;
+import com.android.volley.toolbox.JsonObjectRequest;
 // import com.bumptech.glide.Glide;
 
 
@@ -39,6 +42,8 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.net.URL;
+import org.json.JSONObject;
+import org.json.JSONException;
 
 import android.content.ContentResolver;
 import android.content.Context;
@@ -69,6 +74,7 @@ import android.text.style.URLSpan;
 import android.text.style.ImageSpan;
 import android.text.util.Linkify;
 import android.util.AttributeSet;
+import android.util.Patterns;
 import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
@@ -77,11 +83,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 public class MessageView extends LinearLayout {
-
-    private static int sCacheSize = 512; // 1MiB
-    private static LruCache<String,Bitmap> mBitmapCache = new LruCache<String,Bitmap>(sCacheSize);
-    private RequestQueue mRequestQueue;
-    private ImageLoader mImageLoader;
 
     public enum DeliveryState {
         NEUTRAL, DELIVERED, UNDELIVERED
@@ -114,6 +115,7 @@ public class MessageView extends LinearLayout {
         ImageView mAvatar = (ImageView) findViewById(R.id.avatar);
         View mStatusBlock = findViewById(R.id.status_block);
         ImageView mMediaThumbnail = (ImageView) findViewById(R.id.media_thumbnail);
+        TextView mMediaTitle = (TextView) findViewById(R.id.media_title);
         View mContainer = findViewById(R.id.message_container);
 
         // save the media uri while the MediaScanner is creating the thumbnail
@@ -226,7 +228,7 @@ public class MessageView extends LinearLayout {
                 EmojiManager.getInstance(getContext()).addEmoji(getContext(), spannablecontent);
 
                 mHolder.mTextViewForMessages.setText(spannablecontent);
-                this.findThumbnail(id, spannablecontent, mHolder.mMediaThumbnail);
+                this.expandLinks(spannablecontent);
             } catch (IOException e) {
                 LogCleaner.error(ImApp.LOG_TAG, "error processing message", e);
             }
@@ -291,6 +293,7 @@ public class MessageView extends LinearLayout {
      * @param body
      */
     protected void onClickMediaIcon(String mimeType, String body) {
+        Context context = getContext().getApplicationContext();
 
         if (mimeType.startsWith("audio") || (body.endsWith("3gp")||body.endsWith("amr")))
         {
@@ -312,6 +315,14 @@ public class MessageView extends LinearLayout {
             }
 
 
+        } else if (mimeType.equals("url")) {
+            Uri webpage = Uri.parse( body );
+            Intent intent = new Intent(Intent.ACTION_VIEW, webpage);
+            if (isIntentAvailable(context, intent)) {
+                context.startActivity(intent);
+                return;
+            }
+
         }
 
         Intent intent = new Intent(Intent.ACTION_VIEW);
@@ -326,8 +337,6 @@ public class MessageView extends LinearLayout {
         {
             intent.setData(Uri.parse( body ));
         }
-
-        Context context = getContext().getApplicationContext();
 
         if (isIntentAvailable(context,intent))
         {
@@ -348,14 +357,76 @@ public class MessageView extends LinearLayout {
         return list.size() > 0;
     }
 
-    private void findThumbnail(int id, SpannableString s, ImageView mMediaThumbnail ){
-        Pattern pattern = Pattern.compile("^http://.*?([\\.gif|\\.png|\\.jpg|\\.jpeg])$");
+    private void expandLinks(SpannableString s){
+        Pattern pattern = Patterns.WEB_URL; //Pattern.compile("^http://.*?([\\.gif|\\.png|\\.jpg|\\.jpeg])$");
         Matcher m = pattern.matcher(s);
-        if (m.find()){
-            Uri mediaUri = Uri.parse( m.group(0) );
-            mHolder.mMediaThumbnail.setVisibility(View.VISIBLE);
-            setImageThumbnail( getContext(), mHolder, mediaUri );
+        final TextView mMediaTitle = mHolder.mMediaTitle;
+        final TextView mTextViewForMessages = mHolder.mTextViewForMessages;
+        final ImageView mMediaThumbnail = mHolder.mMediaThumbnail;
+        final Uri mediaUri;
+        // normally, this is hidden
+        mMediaTitle.setVisibility(View.GONE);
+
+        if (m.matches()){
+            mediaUri = Uri.parse( m.group(0) );
+            // we are the full URL, show our great URL thing instead of normal message
+            mTextViewForMessages.setVisibility(View.GONE);
+            mMediaTitle.setVisibility(View.VISIBLE);
+            mMediaTitle.setText(m.group(0));
+        } else if (m.find()) {
+            mediaUri = Uri.parse( m.group(0) );
+        } else {
+            return;
         }
+
+        mMediaThumbnail.setImageResource(R.drawable.ic_file); // TODO: add a prettier loading animation
+        mHolder.setOnClickListenerMediaThumbnail("url", mediaUri.toString());
+
+
+        String path = mediaUri.getPath();
+        Pattern suffixPattern = Pattern.compile(".+\\.(gif|png|jpg|jpeg|tiff)");
+
+        if (path != null && suffixPattern.matcher(path).matches()) {
+            // we are an image loader
+            mMediaThumbnail.setVisibility(View.VISIBLE);
+            mMediaTitle.setVisibility(View.GONE);
+            setImageThumbnail( getContext(), mHolder, mediaUri );
+            return;
+        }
+
+        // we have a non-picture url, load the
+        mHolder.mMediaUri = mediaUri;
+        String url = "http://api.embed.ly/1/oembed?url=" + mediaUri.toString();
+
+        JsonObjectRequest oEmbedLoader = new JsonObjectRequest(Request.Method.GET, url, null, new Response.Listener<JSONObject>() {
+
+            @Override
+            public void onResponse(JSONObject response) {
+                // we are not responsible anymore
+                if (!mHolder.mMediaUri.equals(mediaUri)){ return; }
+                try {
+                    if (response.has("thumbnail_url")) {
+                        mMediaThumbnail.setVisibility(View.VISIBLE);
+                        setImageThumbnail(getContext(), mHolder, Uri.parse( response.getString("thumbnail_url")) );
+                    } else
+                        mMediaThumbnail.setVisibility(View.GONE);
+
+                    mMediaTitle.setText(response.getString("provider_name") + ":" + response.getString("title"));
+                } catch (JSONException e){ }
+            }
+        }, new Response.ErrorListener() {
+
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                // we are not responsible anymore
+                if (!mHolder.mMediaUri.equals(mediaUri)){ return; }
+                mMediaThumbnail.setVisibility(View.GONE);
+
+            }
+        });
+
+        VolleySingleton.getInstance(getContext()).mRequestQueue.add(oEmbedLoader);
+
 
     }
 
@@ -416,7 +487,7 @@ public class MessageView extends LinearLayout {
                  SpannableString spannablecontent=new SpannableString(lastMessage);
 
                  EmojiManager.getInstance(getContext()).addEmoji(getContext(), spannablecontent);
-
+                 this.expandLinks(spannablecontent);
                  mHolder.mTextViewForMessages.setText(spannablecontent);
              } catch (IOException e) {
                  // TODO Auto-generated catch block

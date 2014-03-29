@@ -413,7 +413,7 @@ public class MessageView extends LinearLayout {
                     } else
                         mMediaThumbnail.setVisibility(View.GONE);
 
-                    mMediaTitle.setText(response.getString("provider_name") + ":" + response.getString("title"));
+                    mMediaTitle.setText(response.getString("provider_name") + ": " + response.getString("title"));
                 } catch (JSONException e){ }
             }
         }, new Response.ErrorListener() {

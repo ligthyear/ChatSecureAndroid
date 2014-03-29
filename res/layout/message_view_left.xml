@@ -80,6 +80,7 @@
             android:padding="2dp"
             android:visibility="gone"
             android:fontFamily="sans-serif-light"
+            android:textColor="?@android:attr/textColorLink"
             android:textAppearance="?android:attr/textAppearanceMedium"
             />
 
